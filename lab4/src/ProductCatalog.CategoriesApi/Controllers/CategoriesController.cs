@@ -1,21 +1,26 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.Sqlite;
+using Npgsql;
 using ProductCatalog.CategoriesApi.Models;
 
 namespace ProductCatalog.CategoriesApi.Controllers;
 
 /// <summary>
 /// CRUD-микросервис для справочника категорий изделий.
-/// Вся работа с БД выполнена прямо в контроллере — без дополнительных слоёв.
+/// Вся работа с PostgreSQL выполнена прямо в контроллере.
 /// </summary>
 [ApiController]
 [Route("api/categories")]
 public class CategoriesController : ControllerBase
 {
-    private static readonly string DatabasePath = ResolveDatabasePath();
-    private static readonly string ConnectionString = $"Data Source={DatabasePath}";
-    private static readonly object InitializationLock = new();
+    private static readonly SemaphoreSlim InitializationLock = new(1, 1);
     private static bool _initialized;
+
+    private readonly NpgsqlDataSource _dataSource;
+
+    public CategoriesController(NpgsqlDataSource dataSource)
+    {
+        _dataSource = dataSource;
+    }
 
     /// <summary>
     /// Получить список всех категорий.
@@ -24,13 +29,11 @@ public class CategoriesController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<Category>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<Category>>> GetAll()
     {
-        EnsureDatabase();
+        await EnsureDatabaseAsync();
 
         var categories = new List<Category>();
 
-        await using var connection = new SqliteConnection(ConnectionString);
-        await connection.OpenAsync();
-
+        await using var connection = await _dataSource.OpenConnectionAsync();
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT Id, Name FROM Categories ORDER BY Name;";
 
@@ -39,7 +42,7 @@ public class CategoriesController : ControllerBase
         {
             categories.Add(new Category
             {
-                Id = reader.GetInt64(0),
+                Id = reader.GetInt32(0),
                 Name = reader.GetString(1)
             });
         }
@@ -62,14 +65,12 @@ public class CategoriesController : ControllerBase
             return BadRequest("Название категории не может быть пустым.");
         }
 
-        EnsureDatabase();
+        await EnsureDatabaseAsync();
 
-        await using var connection = new SqliteConnection(ConnectionString);
-        await connection.OpenAsync();
-
+        await using var connection = await _dataSource.OpenConnectionAsync();
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id, Name FROM Categories WHERE Name = $name;";
-        command.Parameters.AddWithValue("$name", name);
+        command.CommandText = "SELECT Id, Name FROM Categories WHERE Name = @name;";
+        command.Parameters.AddWithValue("name", name);
 
         await using var reader = await command.ExecuteReaderAsync();
 
@@ -80,7 +81,7 @@ public class CategoriesController : ControllerBase
 
         return Ok(new Category
         {
-            Id = reader.GetInt64(0),
+            Id = reader.GetInt32(0),
             Name = reader.GetString(1)
         });
     }
@@ -101,10 +102,9 @@ public class CategoriesController : ControllerBase
             return BadRequest("Название категории не может быть пустым.");
         }
 
-        EnsureDatabase();
+        await EnsureDatabaseAsync();
 
-        await using var connection = new SqliteConnection(ConnectionString);
-        await connection.OpenAsync();
+        await using var connection = await _dataSource.OpenConnectionAsync();
 
         if (await CategoryExistsAsync(connection, name))
         {
@@ -112,20 +112,18 @@ public class CategoriesController : ControllerBase
         }
 
         await using var command = connection.CreateCommand();
-        command.CommandText = "INSERT INTO Categories (Name) VALUES ($name);";
-        command.Parameters.AddWithValue("$name", name);
-        await command.ExecuteNonQueryAsync();
+        command.CommandText =
+            """
+            INSERT INTO Categories (Name)
+            VALUES (@name)
+            RETURNING Id;
+            """;
+        command.Parameters.AddWithValue("name", name);
 
-        await using var idCommand = connection.CreateCommand();
-        idCommand.CommandText = "SELECT last_insert_rowid();";
-        long id = Convert.ToInt64(await idCommand.ExecuteScalarAsync());
-
+        long id = Convert.ToInt64(await command.ExecuteScalarAsync());
         var category = new Category { Id = id, Name = name };
 
-        return CreatedAtAction(
-            nameof(GetByName),
-            new { name },
-            category);
+        return CreatedAtAction(nameof(GetByName), new { name }, category);
     }
 
     /// <summary>
@@ -149,10 +147,9 @@ public class CategoriesController : ControllerBase
             return BadRequest("Название категории не может быть пустым.");
         }
 
-        EnsureDatabase();
+        await EnsureDatabaseAsync();
 
-        await using var connection = new SqliteConnection(ConnectionString);
-        await connection.OpenAsync();
+        await using var connection = await _dataSource.OpenConnectionAsync();
 
         if (!await CategoryExistsAsync(connection, oldName))
         {
@@ -166,9 +163,9 @@ public class CategoriesController : ControllerBase
         }
 
         await using var command = connection.CreateCommand();
-        command.CommandText = "UPDATE Categories SET Name = $newName WHERE Name = $oldName;";
-        command.Parameters.AddWithValue("$newName", newName);
-        command.Parameters.AddWithValue("$oldName", oldName);
+        command.CommandText = "UPDATE Categories SET Name = @newName WHERE Name = @oldName;";
+        command.Parameters.AddWithValue("newName", newName);
+        command.Parameters.AddWithValue("oldName", oldName);
         await command.ExecuteNonQueryAsync();
 
         return NoContent();
@@ -189,14 +186,12 @@ public class CategoriesController : ControllerBase
             return BadRequest("Название категории не может быть пустым.");
         }
 
-        EnsureDatabase();
+        await EnsureDatabaseAsync();
 
-        await using var connection = new SqliteConnection(ConnectionString);
-        await connection.OpenAsync();
-
+        await using var connection = await _dataSource.OpenConnectionAsync();
         await using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM Categories WHERE Name = $name;";
-        command.Parameters.AddWithValue("$name", name);
+        command.CommandText = "DELETE FROM Categories WHERE Name = @name;";
+        command.Parameters.AddWithValue("name", name);
 
         if (await command.ExecuteNonQueryAsync() == 0)
         {
@@ -206,96 +201,85 @@ public class CategoriesController : ControllerBase
         return NoContent();
     }
 
-    private static string ResolveDatabasePath()
-    {
-        string? configuredPath = Environment.GetEnvironmentVariable("CATEGORIES_DB_PATH");
-
-        return string.IsNullOrWhiteSpace(configuredPath)
-            ? Path.Combine(AppContext.BaseDirectory, "categories.db")
-            : configuredPath;
-    }
-
-    private static void EnsureDatabase()
+    private async Task EnsureDatabaseAsync()
     {
         if (_initialized)
         {
             return;
         }
 
-        lock (InitializationLock)
+        await InitializationLock.WaitAsync();
+        try
         {
             if (_initialized)
             {
                 return;
             }
 
-            string? directory = Path.GetDirectoryName(DatabasePath);
-            if (!string.IsNullOrWhiteSpace(directory))
+            const int maxAttempts = 30;
+
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                Directory.CreateDirectory(directory);
-            }
-
-            using var connection = new SqliteConnection(ConnectionString);
-            connection.Open();
-
-            using (var command = connection.CreateCommand())
-            {
-                command.CommandText =
-                    """
-                    CREATE TABLE IF NOT EXISTS Categories (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        Name TEXT NOT NULL UNIQUE
-                    );
-                    """;
-                command.ExecuteNonQuery();
-            }
-
-            using (var countCommand = connection.CreateCommand())
-            {
-                countCommand.CommandText = "SELECT COUNT(*) FROM Categories;";
-                long count = Convert.ToInt64(countCommand.ExecuteScalar());
-
-                if (count == 0)
+                try
                 {
-                    SeedCategories(connection);
+                    await using var connection = await _dataSource.OpenConnectionAsync();
+
+                    await using (var command = connection.CreateCommand())
+                    {
+                        command.CommandText =
+                            """
+                            CREATE TABLE IF NOT EXISTS Categories (
+                                Id SERIAL PRIMARY KEY,
+                                Name TEXT NOT NULL UNIQUE
+                            );
+                            """;
+                        await command.ExecuteNonQueryAsync();
+                    }
+
+                    await using (var command = connection.CreateCommand())
+                    {
+                        command.CommandText =
+                            """
+                            INSERT INTO Categories (Name)
+                            VALUES
+                                (@c1),
+                                (@c2),
+                                (@c3),
+                                (@c4)
+                            ON CONFLICT (Name) DO NOTHING;
+                            """;
+                        command.Parameters.AddWithValue("c1", "Молочные продукты");
+                        command.Parameters.AddWithValue("c2", "Хлебобулочные изделия");
+                        command.Parameters.AddWithValue("c3", "Напитки");
+                        command.Parameters.AddWithValue("c4", "Бакалея");
+                        await command.ExecuteNonQueryAsync();
+                    }
+
+                    _initialized = true;
+                    return;
+                }
+                catch (NpgsqlException) when (attempt < maxAttempts)
+                {
+                    await Task.Delay(1000);
                 }
             }
 
-            _initialized = true;
+            throw new InvalidOperationException(
+                "Не удалось подключиться к PostgreSQL и создать таблицу категорий.");
         }
-    }
-
-    private static void SeedCategories(SqliteConnection connection)
-    {
-        string[] categories =
-        [
-            "Молочные продукты",
-            "Хлебобулочные изделия",
-            "Напитки",
-            "Бакалея"
-        ];
-
-        using var transaction = connection.BeginTransaction();
-
-        foreach (string category in categories)
+        finally
         {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = "INSERT OR IGNORE INTO Categories (Name) VALUES ($name);";
-            command.Parameters.AddWithValue("$name", category);
-            command.ExecuteNonQuery();
+            InitializationLock.Release();
         }
-
-        transaction.Commit();
     }
 
     private static async Task<bool> CategoryExistsAsync(
-        SqliteConnection connection,
+        NpgsqlConnection connection,
         string name)
     {
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM Categories WHERE Name = $name;";
-        command.Parameters.AddWithValue("$name", name);
+        command.CommandText = "SELECT COUNT(*) FROM Categories WHERE Name = @name;";
+        command.Parameters.AddWithValue("name", name);
 
         return Convert.ToInt64(await command.ExecuteScalarAsync()) > 0;
     }

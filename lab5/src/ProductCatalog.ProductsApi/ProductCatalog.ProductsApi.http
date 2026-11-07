@@ -1,0 +1,43 @@
+@ProductCatalog.ProductsApi_HostAddress = http://localhost:5210
+
+### Получить все продукты
+GET {{ProductCatalog.ProductsApi_HostAddress}}/api/products
+Accept: application/json
+
+### Получить продукт по Id
+GET {{ProductCatalog.ProductsApi_HostAddress}}/api/products/1
+Accept: application/json
+
+### Добавить продукт
+POST {{ProductCatalog.ProductsApi_HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "name": "Молоко 3,2%",
+  "description": "Пастеризованное молоко 1 л",
+  "category": "Молочные продукты",
+  "quantity": 10
+}
+
+### Изменить продукт
+PUT {{ProductCatalog.ProductsApi_HostAddress}}/api/products/1
+Content-Type: application/json
+
+{
+  "name": "Молоко 3,2%",
+  "description": "Пастеризованное молоко 1 л",
+  "category": "Молочные продукты",
+  "quantity": 12
+}
+
+### Удалить продукт
+DELETE {{ProductCatalog.ProductsApi_HostAddress}}/api/products/1
+
+### Excel: продукты в наличии
+GET {{ProductCatalog.ProductsApi_HostAddress}}/api/reports/products-in-stock
+
+### PDF: круговая диаграмма отсутствующих продуктов
+GET {{ProductCatalog.ProductsApi_HostAddress}}/api/reports/out-of-stock-pie
+
+### Word: все продукты
+GET {{ProductCatalog.ProductsApi_HostAddress}}/api/reports/all-products
