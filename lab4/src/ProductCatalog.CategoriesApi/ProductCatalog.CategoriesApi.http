@@ -1,0 +1,28 @@
+@ProductCatalog.CategoriesApi_HostAddress = http://localhost:5209
+
+### Получить все категории
+GET {{ProductCatalog.CategoriesApi_HostAddress}}/api/categories
+Accept: application/json
+
+### Получить категорию по названию
+GET {{ProductCatalog.CategoriesApi_HostAddress}}/api/categories/Молочные%20продукты
+Accept: application/json
+
+### Добавить категорию
+POST {{ProductCatalog.CategoriesApi_HostAddress}}/api/categories
+Content-Type: application/json
+
+{
+  "name": "Кондитерские изделия"
+}
+
+### Изменить категорию
+PUT {{ProductCatalog.CategoriesApi_HostAddress}}/api/categories/Кондитерские%20изделия
+Content-Type: application/json
+
+{
+  "name": "Сладости"
+}
+
+### Удалить категорию
+DELETE {{ProductCatalog.CategoriesApi_HostAddress}}/api/categories/Сладости
