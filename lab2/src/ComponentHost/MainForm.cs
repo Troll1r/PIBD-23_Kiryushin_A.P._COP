@@ -79,6 +79,18 @@ public partial class MainForm : Form
             target.DropDownItems.Add(menuItem);
         }
 
+        if (_userAccessLevel >= AccessLevel.Advanced)
+        {
+            if (reportsToolStripMenuItem.DropDownItems.Count > 0)
+            {
+                reportsToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
+            }
+
+            var extensionsItem = new ToolStripMenuItem("Расширения");
+            extensionsItem.Click += (_, _) => OpenExtensions();
+            reportsToolStripMenuItem.DropDownItems.Add(extensionsItem);
+        }
+
         directoriesToolStripMenuItem.Visible =
             directoriesToolStripMenuItem.DropDownItems.Count > 0;
         reportsToolStripMenuItem.Visible =
@@ -92,6 +104,12 @@ public partial class MainForm : Form
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
+    }
+
+    private void OpenExtensions()
+    {
+        using var form = new ExtensionsForm();
+        form.ShowDialog(this);
     }
 
     private void OpenComponent(IComponentContract component)

@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PluginsContracts\PluginsContracts.csproj" />
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
+  </ItemGroup>
+
+  <Target Name="CopyPluginToHost" AfterTargets="Build">
+    <PropertyGroup>
+      <HostOutput>$(MSBuildThisFileDirectory)..\..\..\lab2\src\ComponentHost\bin\$(Configuration)\net9.0-windows</HostOutput>
+    </PropertyGroup>
+    <ItemGroup>
+      <PluginOutput Include="$(TargetDir)**\*.*" />
+    </ItemGroup>
+    <MakeDir Directories="$(HostOutput)\Plugins" />
+    <Copy SourceFiles="@(PluginOutput)" DestinationFolder="$(HostOutput)\%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(HostOutput)\Plugins" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
