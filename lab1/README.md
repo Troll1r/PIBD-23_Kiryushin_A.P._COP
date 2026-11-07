@@ -29,7 +29,9 @@
 ```
 lab1/
 ├── Lab1.sln
+├── NuGet.config                    # локальный источник NuGet-пакетов
 ├── README.md
+├── nuget-feed/                     # папка-источник с собранным .nupkg
 └── src/
     ├── SelectionControlLibrary/      # библиотека визуальных компонентов
     │   ├── ComboBoxSelector.cs
@@ -69,17 +71,38 @@ dotnet run --project lab1/src/Lab1.TestApp
 После сборки библиотеки компонент `ComboBoxSelector` появляется в панели
 элементов, и его можно перетащить на форму.
 
-### Использование через NuGet-пакет
+### Подключение через локальный NuGet-пакет
 
-При сборке библиотеки создаётся файл:
+В `lab1/NuGet.config` уже добавлен локальный источник `Lab1Local`, который
+указывает на папку `lab1/nuget-feed`. Тестовое приложение подключает компонент
+как NuGet-пакет:
 
+```xml
+<PackageReference Include="SelectionControlLibrary.Kiryushin" Version="1.0.0" />
 ```
-lab1/src/SelectionControlLibrary/bin/Debug/SelectionControlLibrary.Kiryushin.1.0.0.nupkg
+
+Актуальный пакет лежит в
+`lab1/nuget-feed/SelectionControlLibrary.Kiryushin.1.0.0.nupkg`. При сборке
+библиотеки пакет также создаётся в
+`lab1/src/SelectionControlLibrary/bin/<Configuration>/SelectionControlLibrary.Kiryushin.1.0.0.nupkg`.
+
+Если библиотека изменилась, обновите пакет в локальном источнике:
+
+```powershell
+dotnet pack lab1/src/SelectionControlLibrary/SelectionControlLibrary.csproj -c Release -o lab1/nuget-feed
 ```
 
-В Visual Studio: **Сервис → Параметры → NuGet Packager → Источники пакетов** —
-добавить папку с пакетом, затем подключить пакет
-`SelectionControlLibrary.Kiryushin` к нужному проекту.
+При изменении версии обновите `<Version>` в
+`SelectionControlLibrary.csproj` и `Version` в `PackageReference` тестового
+приложения, затем выполните `dotnet restore --force`. В Visual Studio локальный
+источник уже настроен через `NuGet.config`, отдельно добавлять его в параметрах
+не нужно.
+
+Проверить подключение пакета:
+
+```powershell
+dotnet list lab1/src/Lab1.TestApp/Lab1.TestApp.csproj package
+```
 
 ## 4. Описание компонента `ComboBoxSelector`
 

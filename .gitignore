@@ -426,3 +426,7 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Local NuGet feed for laboratory work 1 (committed on purpose)
+!lab1/nuget-feed/
+!lab1/nuget-feed/*.nupkg
