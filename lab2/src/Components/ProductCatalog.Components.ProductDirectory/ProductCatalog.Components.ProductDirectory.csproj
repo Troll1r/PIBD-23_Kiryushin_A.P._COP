@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\ComponentOrientedPlatform\ComponentOrientedPlatform.csproj" />
+    <ProjectReference Include="..\..\ProductCatalog.Data\ProductCatalog.Data.csproj" />
+    <ProjectReference Include="..\..\..\..\lab1\src\SelectionControlLibrary\SelectionControlLibrary.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyComponentToHost" AfterTargets="Build">
+    <PropertyGroup>
+      <HostComponentsDirectory>$(MSBuildThisFileDirectory)..\..\ComponentHost\bin\$(Configuration)\net9.0-windows\Components</HostComponentsDirectory>
+    </PropertyGroup>
+    <MakeDir Directories="$(HostComponentsDirectory)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(HostComponentsDirectory)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

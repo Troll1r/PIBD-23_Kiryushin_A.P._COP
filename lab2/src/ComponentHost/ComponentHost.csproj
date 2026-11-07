@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ComponentOrientedPlatform\ComponentOrientedPlatform.csproj" />
+    <ProjectReference Include="..\ProductCatalog.Data\ProductCatalog.Data.csproj" />
+    <ProjectReference Include="..\..\..\lab1\src\SelectionControlLibrary\SelectionControlLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Components\ProductCatalog.Components.SimpleDirectory\ProductCatalog.Components.SimpleDirectory.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Components\ProductCatalog.Components.ProductDirectory\ProductCatalog.Components.ProductDirectory.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Components\ProductCatalog.Components.ProductReport\ProductCatalog.Components.ProductReport.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
